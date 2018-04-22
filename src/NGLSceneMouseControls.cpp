@@ -76,9 +76,13 @@ void NGLScene::wheelEvent( QWheelEvent* _event )
   if ( _event->delta() > 0 )
   {
     m_modelPos.m_z += ZOOM;
+    m_modelPos.m_y += ZOOM;
+    m_modelPos.m_z += ZOOM;
   }
   else if ( _event->delta() < 0 )
   {
+    m_modelPos.m_z -= ZOOM;
+    m_modelPos.m_y -= ZOOM;
     m_modelPos.m_z -= ZOOM;
   }
   update();

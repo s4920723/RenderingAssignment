@@ -13,7 +13,7 @@
 
 NGLScene::NGLScene()
 {
-  setTitle( "Qt5 Simple NGL Demo" );
+  setTitle( "Real-Time Rendering Assignment - s4920723" );
 }
 
 
