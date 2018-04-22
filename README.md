@@ -1,5 +1,5 @@
 #h1 Principles of Rendering Assignment - Real-time Rendering
-![alt text](https://imgur.com/a/wY5Z0kE)
+![alt text](https://i.imgur.com/NpekBud.jpg)
 
 This is WIP surface shading program that uses the NCCA Graphics Library(NGL) and GLSL.
 The aim is to render a PBR shaded model. The boilerplate code is taken from Jon Macey's
