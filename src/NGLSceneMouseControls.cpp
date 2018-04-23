@@ -12,7 +12,7 @@ void NGLScene::mouseMoveEvent( QMouseEvent* _event )
   {
     int diffx = _event->x() - m_win.origX;
     int diffy = _event->y() - m_win.origY;
-    m_win.spinXFace += static_cast<int>( 0.5f * diffy );
+    //m_win.spinXFace += static_cast<int>( 0.5f * diffy );
     m_win.spinYFace += static_cast<int>( 0.5f * diffx );
     m_win.origX = _event->x();
     m_win.origY = _event->y();

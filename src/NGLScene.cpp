@@ -58,8 +58,8 @@ void NGLScene::initializeGL()
   shader->attachShader( vertexShader, ngl::ShaderType::VERTEX );
   shader->attachShader( fragShader, ngl::ShaderType::FRAGMENT );
   // attach the source
-  shader->loadShaderSource( vertexShader, "shaders/PhongVertex.glsl" );
-  shader->loadShaderSource( fragShader, "shaders/PhongFragment.glsl" );
+  shader->loadShaderSource( vertexShader, "shaders/myPhongVert.glsl" );
+  shader->loadShaderSource( fragShader, "shaders/myPhongFrag.glsl" );
   // compile the shaders
   shader->compileShader( vertexShader );
   shader->compileShader( fragShader );
@@ -118,6 +118,7 @@ void NGLScene::loadMatricesToShader()
   shader->setUniform( "MVP", MVP );
   shader->setUniform( "normalMatrix", normalMatrix );
   shader->setUniform( "M", M );
+  shader->setUniform("diffuseColour", ngl::Vec3(0.3f, 0.5f, 0.9f));
 }
 
 void NGLScene::paintGL()
