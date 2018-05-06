@@ -6,5 +6,5 @@ uniform sampler2D fboTexture;
 
 void main()
 {
-    fragColour = texture(fboTexture, wsUV) * 1.0;
+    fragColour = texture(fboTexture, wsUV);
 }

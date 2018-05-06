@@ -10,10 +10,6 @@ struct lightInfo
         vec4 ambient;
         vec4 diffuse;
         vec4 specular;
-        /*float constantAttenuation;
-        float spotCosCutoff;
-        float quadraticAttenuation;
-        float linearAttenuation;*/
 };
 
 uniform lightInfo keyLight;

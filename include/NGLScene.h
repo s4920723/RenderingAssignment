@@ -11,6 +11,7 @@
 #include <ngl/Texture.h>
 #include <ngl/Obj.h>
 #include <memory>
+#include <vector>
 //----------------------------------------------------------------------------------------------------------------------
 /// @file NGLScene.h
 /// @brief this class inherits from the Qt OpenGLWindow and allows us to use NGL to draw OpenGL
@@ -104,6 +105,8 @@ private:
   void wheelEvent(QWheelEvent *_event) override;
 
   void createFBO();
+  void loadCubemap();
+  void createTexturePack();
 
   ngl::Transformation m_modelTransform;
   ngl::Vec3 m_lightPos;
@@ -113,9 +116,13 @@ private:
   ngl::Light m_rimLight;
 
   ngl::Texture m_texture;
+  std::vector<std::string> m_cubeTextures;
 
+  //Object IDs
   GLuint m_fboId;
   GLuint m_fboTextureId;
+  GLuint m_fboDepthId;
+  GLuint m_cubeMapId;
 
   std::unique_ptr<ngl::Obj> m_harmonicaGeo;
 };

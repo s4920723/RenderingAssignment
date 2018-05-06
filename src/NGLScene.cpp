@@ -9,6 +9,8 @@
 #include <ngl/NGLStream.h>
 #include <ngl/ShaderLib.h>
 #include <ngl/VAOPrimitives.h>
+#include <ngl/Image.h>
+#include <string>
 
 
 NGLScene::NGLScene()
@@ -21,7 +23,6 @@ NGLScene::~NGLScene()
 {
   std::cout << "Shutting down NGL, removing VAO's and Shaders\n";
 }
-
 
 
 void NGLScene::resizeGL( int _w, int _h )
@@ -48,7 +49,9 @@ void NGLScene::initializeGL()
   initShader("myPhong", "shaders/myPhongVert.glsl", "shaders/myPhongFrag.glsl");
   initShader("jonPhong", "shaders/PhongVertex.glsl", "shaders/PhongFragment.glsl");
   initShader("multipassShader", "shaders/multipassVert.glsl", "shaders/multiPassFrag.glsl");
+  initShader("envShader", "shaders/envVert.glsl", "shaders/envFrag.glsl");
   ( *shader )[ "myPhong" ]->use();
+
   //CAMERA SETUP
   ngl::Vec3 from( 1, 1, 1 );
   ngl::Vec3 to( 0, 0, 0 );
@@ -58,7 +61,7 @@ void NGLScene::initializeGL()
   shader->setUniform( "viewerPos", m_cam.getEye().toVec3());
 
   //CREATING LIGHTS
-;
+  m_lightPos.set(0.3, 0.3, 0.3);
   initLights(ngl::Colour(1.0, 1.0, 1.0, 1.0), "myPhong");
 
   //SETTING UP GEOMETRY
@@ -70,11 +73,25 @@ void NGLScene::initializeGL()
   m_texture.loadImage("textures/onyxTiles/TilesOnyxOpaloBlack001_COL_2K.jpg");
   m_texture.setTextureGL();
 
+  //CREATE ENVIRONMENT MAP
+  m_cubeTextures.push_back("textures/envTex/sky_xpos.png");
+  m_cubeTextures.push_back("textures/envTex/sky_xneg.png");
+  m_cubeTextures.push_back("textures/envTex/sky_ypos.png");
+  m_cubeTextures.push_back("textures/envTex/sky_yneg.png");
+  m_cubeTextures.push_back("textures/envTex/sky_zpos.png");
+  m_cubeTextures.push_back("textures/envTex/sky_zneg.png");
+  loadCubemap();
+
+  //CREATE FRAMEBUFFER OBJECT
   createFBO();
 
+  //INITIALIZE GEOMTRY PRIMITIVES
   ngl::VAOPrimitives *prim=ngl::VAOPrimitives::instance();
   prim->createTrianglePlane("plane",2,2,1,1,ngl::Vec3(0,1,0));
+  prim->createSphere("lightShape", 0.15, 64);
+  prim->createDisk("plate", 1, 64);
 }
+
 
 void NGLScene::initShader(std::string shaderProgramName, std::string vertSource, std::string fragSource)
 {
@@ -93,6 +110,7 @@ void NGLScene::initShader(std::string shaderProgramName, std::string vertSource,
     shader->attachShaderToProgram( shaderProgram, fragShader );
     shader->linkProgramObject( shaderProgram );
 }
+
 
 void NGLScene::initLights(ngl::Colour _lightColour, std::string shaderName)
 {
@@ -131,19 +149,38 @@ void NGLScene::initLights(ngl::Colour _lightColour, std::string shaderName)
 
 }
 
+
 void NGLScene::createFBO()
 {
+    //Bind framebuffer
     glGenFramebuffers(1, &m_fboId);
     glBindFramebuffer(GL_FRAMEBUFFER, m_fboId);
+
+    //Create Colour Texture that the framebuffer will write to
     glGenTextures(1, &m_fboTextureId);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, m_fboTextureId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 800, 600, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_win.width, m_win.height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_fboTextureId, 0);
 
+    //Create Depth Texture that the framebuffer will write to
+    glGenTextures(1, &m_fboDepthId);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, m_fboDepthId);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, m_win.width, m_win.height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    //Attach the textures to the framebuffer
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_fboTextureId, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_fboDepthId, 0);
+    GLenum drawBufs[] = {GL_COLOR_ATTACHMENT0};
+    glDrawBuffers(1, drawBufs);
+
+    //Check if the framebuffer works and bind the revert back to the normal framebuffer
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
     {
         std::cout << "Frame buffer works!\n";
@@ -151,6 +188,31 @@ void NGLScene::createFBO()
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void NGLScene::loadCubemap()
+{
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+    glActiveTexture (GL_TEXTURE3);
+
+    glGenTextures(1, &m_cubeMapId);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMapId);
+
+    for (unsigned int i = 0; i < m_cubeTextures.size(); i++)
+    {
+        ngl::Image img;
+        img.load(m_cubeTextures[i]);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                         0, GL_RGB, img.width(), img.height(), 0, GL_RGB, GL_UNSIGNED_BYTE, img.getPixels());
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    ngl::ShaderLib *shader=ngl::ShaderLib::instance();
+    shader->use("envShader");
+    shader->setUniform("envMap", 3);
+}
 
 
 void NGLScene::loadMatricesToShader(bool mouseControls)
@@ -180,16 +242,10 @@ void NGLScene::loadMatricesToShader(bool mouseControls)
   shader->setUniform("camPos", m_cam.getEye());
 }
 
+
 void NGLScene::paintGL()
 {
-  glViewport( 0, 0, m_win.width, m_win.height );
-  glClearColor(0.5, 0.65, 0.9, 1.0);
-  // clear the screen and depth buffer
-  glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
-  // grab an instance of the shader manager
-  ngl::ShaderLib* shader = ngl::ShaderLib::instance();
-  ( *shader )[ "myPhong" ]->use();
 
   // Rotation based on the mouse position for our global transform
   ngl::Mat4 rotX;
@@ -204,38 +260,44 @@ void NGLScene::paintGL()
   m_mouseGlobalTX.m_m[ 3 ][ 1 ] = m_modelPos.m_y;
   m_mouseGlobalTX.m_m[ 3 ][ 2 ] = m_modelPos.m_z;
 
-  // get the VBO instance and draw the built in teapot
-  ngl::VAOPrimitives* prim = ngl::VAOPrimitives::instance();
-  prim->createSphere("sphere", 0.15, 64);
-  prim->createDisk("surface", 1, 64);
-
   //switching framebuffer
   glBindFramebuffer(GL_FRAMEBUFFER, m_fboId);
+  glViewport(0,0,m_win.width, m_win.height);
   glClearColor(0.5, 0.65, 0.9, 1.0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  // draw teapot
-  m_modelTransform.setMatrix(1.0f);
+  // DRAW SCENE
+  //drawing environment cube
+  ngl::ShaderLib* shader = ngl::ShaderLib::instance();
+  ( *shader )[ "envShader" ]->use();
+  ngl::VAOPrimitives* prim = ngl::VAOPrimitives::instance();
+  loadMatricesToShader(false);
+  prim->draw("cube");
+
+
+  /*m_modelTransform.setMatrix(1.0f);
   loadMatricesToShader(true);
   prim->draw( "teapot" );
   //m_harmonicaGeo->draw();
-  //draw disk
+
+
   ( *shader )[ ngl::nglColourShader ]->use();
   shader->setUniform("Colour", 0.5f, 0.5f, 0.5f, 1.0f);
   m_modelTransform.setPosition(0.0, -0.5, 0.0);
   m_modelTransform.setRotation(90.0, 0.0, 0.0);
   loadMatricesToShader(true);
-  prim->draw("surface");
+  prim->draw("plate");
   ( *shader )[ ngl::nglColourShader ]->use();
   shader->setUniform("Colour", 1.0f, 1.0f, 1.0f, 1.0f);
   m_modelTransform.setPosition(m_lightPos);
   loadMatricesToShader(false);
-  prim->draw("sphere");
+  prim->draw("lightShape"); */
 
-
+  //Switch back to normal framebuffer
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glViewport(0,0,m_win.width,m_win.height);
   (*shader)["multipassShader"]->use();
   GLint pid = shader->getProgramID("multipassShader");
 
@@ -243,19 +305,16 @@ void NGLScene::paintGL()
   glActiveTexture(GL_TEXTURE1);
   glBindTexture(GL_TEXTURE_2D, m_fboTextureId);
   glUniform1i(glGetUniformLocation(pid, "fboTexture"), 1);
-
+  glActiveTexture(GL_TEXTURE2);
+  glBindTexture(GL_TEXTURE_2D, m_fboDepthId);
+  m_modelTransform.reset();
   loadMatricesToShader(true);
   prim->draw("plane");
   glBindTexture(GL_TEXTURE_2D, 0);
-
 }
-
-//----------------------------------------------------------------------------------------------------------------------
 
 void NGLScene::keyPressEvent( QKeyEvent* _event )
 {
-  // that method is called every time the main window recives a key event.
-  // we then switch on the key value and set the camera in the GLWindow
   switch ( _event->key() )
   {
     // escape key to quit
