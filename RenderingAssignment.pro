@@ -26,10 +26,13 @@ INCLUDEPATH +=./include \
               C:/NGL/include
 # where our exe is going to live (root of project)
 DESTDIR=./
+
+LIBS += C:/boost/stage/lib/*
 # add the glsl shader files
 OTHER_FILES+= shaders/*.glsl \
               README.md \
-              SimpleNGL.py
+              SimpleNGL.py \
+              data/*.obj
 # were are going to default to a console app
 CONFIG += console
 # note each command you add needs a ; as it will be run as a single line

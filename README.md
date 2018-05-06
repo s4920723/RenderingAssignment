@@ -6,12 +6,13 @@ The aim is to render a PBR shaded model. The boilerplate code is taken from Jon 
 SimpleNGL demo.
 
 ## To do list
-* Look into GLSL basics.
+* ~Look into GLSL basics.~
 * Import obj model.
-* Apply Phong shader.
-* Figure out texturing.
-* Look into Frame buffer object for multipass rendering.
+* ~Apply Phong shader.~
+* ~Figure out texturing.~
+* ~Look into Frame buffer object for multipass rendering.~
 * Add shadows and environment mapping.
+* Add depth of field.
 
-## Stretch Goal
-* PBR
+## Stretch goals
+* Parallax Mapping for the wholes

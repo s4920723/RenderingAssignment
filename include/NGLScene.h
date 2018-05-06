@@ -6,6 +6,11 @@
 #include <ngl/Light.h>
 #include <ngl/Text.h>
 #include <QOpenGLWindow>
+#include <ngl/Transformation.h>
+#include <string>
+#include <ngl/Texture.h>
+#include <ngl/Obj.h>
+#include <memory>
 //----------------------------------------------------------------------------------------------------------------------
 /// @file NGLScene.h
 /// @brief this class inherits from the Qt OpenGLWindow and allows us to use NGL to draw OpenGL
@@ -46,6 +51,8 @@ public:
   //----------------------------------------------------------------------------------------------------------------------
   void resizeGL(int _w, int _h) override;
 
+  void initShader(std::string shaderProgramName, std::string vertSource, std::string fragSource);
+  void initLights(ngl::Colour _lightColour, std::string shaderName);
 private:
   //----------------------------------------------------------------------------------------------------------------------
   /// @brief the windows params such as mouse and rotations etc
@@ -66,7 +73,7 @@ private:
   //----------------------------------------------------------------------------------------------------------------------
   /// @brief method to load transform matrices to the shader
   //----------------------------------------------------------------------------------------------------------------------
-  void loadMatricesToShader();
+  void loadMatricesToShader(bool mouseControls);
   //----------------------------------------------------------------------------------------------------------------------
   /// @brief Qt Event called when a key is pressed
   /// @param [in] _event the Qt event to query for size etc
@@ -95,6 +102,22 @@ private:
   /// @param _event the Qt Event structure
   //----------------------------------------------------------------------------------------------------------------------
   void wheelEvent(QWheelEvent *_event) override;
+
+  void createFBO();
+
+  ngl::Transformation m_modelTransform;
+  ngl::Vec3 m_lightPos;
+
+  ngl::Light m_keyLight;
+  ngl::Light m_fillLight;
+  ngl::Light m_rimLight;
+
+  ngl::Texture m_texture;
+
+  GLuint m_fboId;
+  GLuint m_fboTextureId;
+
+  std::unique_ptr<ngl::Obj> m_harmonicaGeo;
 };
 
 
