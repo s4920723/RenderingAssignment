@@ -104,7 +104,7 @@ private:
   //----------------------------------------------------------------------------------------------------------------------
   void wheelEvent(QWheelEvent *_event) override;
 
-  void createFBO();
+  void createFBO(GLuint _colourUnit, GLuint _depthUnit);
   void loadCubemap();
   void createTexturePack();
 
@@ -125,7 +125,8 @@ private:
   GLuint m_fboDepthId;
   GLuint m_cubeMapId;
 
-  std::unique_ptr<ngl::Obj> m_harmonicaGeo;
+  std::unique_ptr<ngl::Obj> m_harmonicaGeoSides;
+  std::unique_ptr<ngl::Obj> m_harmonicaGeoMiddle;
 };
 
 

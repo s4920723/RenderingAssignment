@@ -15,7 +15,7 @@
 
 NGLScene::NGLScene()
 {
-  setTitle( "Real-Time Rendering Assignment - s4920723" );
+  setTitle( "Real-Time Rendering Assignment - s4920723");
 }
 
 
@@ -48,8 +48,9 @@ void NGLScene::initializeGL()
   //CREATING SHADERS
   ngl::ShaderLib* shader = ngl::ShaderLib::instance();
   initShader("myPhong", "shaders/myPhongVert.glsl", "shaders/myPhongFrag.glsl");
+  initShader("myPBR", "shaders/myPBRVert.glsl", "shaders/myPBRFrag.glsl");
   initShader("jonPhong", "shaders/PhongVertex.glsl", "shaders/PhongFragment.glsl");
-  initShader("multipassShader", "shaders/multipassVert.glsl", "shaders/multiPassFrag.glsl");
+  initShader("multipassShader", "shaders/multipassVert.glsl", "shaders/multipassFrag.glsl");
   initShader("envShader", "shaders/envVert.glsl", "shaders/envFrag.glsl");
   ( *shader )[ "myPhong" ]->use();
 
@@ -62,32 +63,53 @@ void NGLScene::initializeGL()
   shader->setUniform( "viewerPos", m_cam.getEye().toVec3());
 
   //CREATING LIGHTS
-  m_lightPos.set(0.3, 0.3, 0.3);
+  m_lightPos.set(0.3f, 0.3f, 0.3f);
   initLights(ngl::Colour(1.0, 1.0, 1.0, 1.0), "myPhong");
 
   //SETTING UP GEOMETRY
-  //m_harmonicaGeo.reset(  new ngl::Obj("data/harmonica_full.obj", "textures/onyxTiles/TilesOnyxOpaloBlack001_COL_2K.jpg"));
-  // now we need to create this as a VAO so we can draw it
-  //m_harmonicaGeo->createVAO();
+  m_harmonicaGeoSides.reset(  new ngl::Obj("data/harmonica_topBottom.obj"));
+  m_harmonicaGeoSides->createVAO();
+  m_harmonicaGeoMiddle.reset(  new ngl::Obj("data/harmonica_middle.obj"));
+  m_harmonicaGeoMiddle->createVAO();
+
 
   //SETTING UP TEXTURES
-  m_texture.loadImage("textures/onyxTiles/TilesOnyxOpaloBlack001_COL_2K.jpg");
+  shader->use("myPBR");
+  m_texture.loadImage("textures/wood/WoodPlanksWorn33_COL_VAR1_3K.jpg");
+  m_texture.setMultiTexture(0);
   m_texture.setTextureGL();
+  shader->setUniform("albidoMap", 0);
+  m_texture.loadImage("textures/wood/WoodPlanksWorn33_GLOSS_3K.jpg");
+  m_texture.setMultiTexture(1);
+  m_texture.setTextureGL();
+  shader->setUniform("roghnessMap", 1);
+  m_texture.loadImage("textures/wood/WoodPlanksWorn33_GLOSS_3K.jpg");
+  m_texture.setMultiTexture(2);
+  m_texture.setTextureGL();
+  shader->setUniform("metallicMap", 2);
+  m_texture.loadImage("textures/wood/WoodPlanksWorn33_NRM_3K.jpg");
+  m_texture.setMultiTexture(3);
+  m_texture.setTextureGL();
+  shader->setUniform("normalMap", 3);
+  m_texture.loadImage("textures/onyxTiles/TilesOnyxOpaloBlack001_AO_3K.jpg");
+  m_texture.setMultiTexture(4);
+  m_texture.setTextureGL();
+  shader->setUniform("aoMap", 4);
 
   //CREATE ENVIRONMENT MAP
-  m_cubeTextures.push_back("textures/envTex/sky_xpos.png");
-  m_cubeTextures.push_back("textures/envTex/sky_xneg.png");
-  m_cubeTextures.push_back("textures/envTex/sky_ypos.png");
-  m_cubeTextures.push_back("textures/envTex/sky_yneg.png");
-  m_cubeTextures.push_back("textures/envTex/sky_zpos.png");
-  m_cubeTextures.push_back("textures/envTex/sky_zneg.png");
+  m_cubeTextures.push_back("textures/envTex/nissiBeach/posx.jpg");
+  m_cubeTextures.push_back("textures/envTex/nissiBeach/negx.jpg");
+  m_cubeTextures.push_back("textures/envTex/nissiBeach/negy.jpg");
+  m_cubeTextures.push_back("textures/envTex/nissiBeach/posy.jpg");
+  m_cubeTextures.push_back("textures/envTex/nissiBeach/posz.jpg");
+  m_cubeTextures.push_back("textures/envTex/nissiBeach/negz.jpg");
   loadCubemap();
 
   //INITIALIZE GEOMTRY PRIMITIVES
   ngl::VAOPrimitives *prim=ngl::VAOPrimitives::instance();
   prim->createTrianglePlane("plane",2,2,1,1,ngl::Vec3(0,1,0));
-  prim->createSphere("lightShape", 0.15, 64);
-  prim->createDisk("plate", 1, 64);
+  prim->createSphere("lightShape", 0.15f, 64);
+  prim->createTrianglePlane("table", 3, 3, 1, 1, ngl::Vec3(0,1,0));
 }
 
 
@@ -144,11 +166,10 @@ void NGLScene::initLights(ngl::Colour _lightColour, std::string shaderName)
     m_keyLight.loadToShader("keyLight");
     m_fillLight.loadToShader("fillLight");
     m_rimLight.loadToShader("rimLight");
-
 }
 
 
-void NGLScene::createFBO()
+void NGLScene::createFBO(GLuint _colourUnit, GLuint _depthUnit)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, m_fboId);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER)==GL_FRAMEBUFFER_COMPLETE)
@@ -161,7 +182,7 @@ void NGLScene::createFBO()
 
     //Create Colour Texture that the framebuffer will write to
     glGenTextures(1, &m_fboTextureId);
-    glActiveTexture(GL_TEXTURE1);
+    glActiveTexture(GL_TEXTURE0+_colourUnit);
     glBindTexture(GL_TEXTURE_2D, m_fboTextureId);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_win.width, m_win.height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -170,7 +191,7 @@ void NGLScene::createFBO()
 
     //Create Depth Texture that the framebuffer will write to
     glGenTextures(1, &m_fboDepthId);
-    glActiveTexture(GL_TEXTURE2);
+    glActiveTexture(GL_TEXTURE0 + _depthUnit);
     glBindTexture(GL_TEXTURE_2D, m_fboDepthId);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, m_win.width, m_win.height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -206,7 +227,7 @@ void NGLScene::loadCubemap()
         ngl::Image img;
         img.load(m_cubeTextures[i]);
         glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
-                         0, GL_RGBA, img.width(), img.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, img.getPixels());
+                         0, GL_RGB, static_cast<GLsizei>(img.width()), static_cast<GLsizei>(img.width()), 0, GL_RGB, GL_UNSIGNED_BYTE, img.getPixels());
     }
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -216,6 +237,9 @@ void NGLScene::loadCubemap()
 
     ngl::ShaderLib *shader=ngl::ShaderLib::instance();
     shader->use("envShader");
+    shader->setUniform("envMap", 3);
+
+    shader->use("myPhong");
     shader->setUniform("envMap", 3);
 }
 
@@ -262,14 +286,14 @@ void NGLScene::paintGL()
 
   if (m_isFBODirty)
   {
-      createFBO();
+      createFBO(5, 6);
       m_isFBODirty = false;
   }
 
   //switching to framebuffer object
   glBindFramebuffer(GL_FRAMEBUFFER, m_fboId);
   glViewport(0,0,m_win.width, m_win.height);
-  glClearColor(0.5, 0.65, 0.9, 1.0);
+  glClearColor(0.5, 0.65f, 0.9f, 1.0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   ngl::ShaderLib* shader = ngl::ShaderLib::instance();
   ngl::VAOPrimitives* prim = ngl::VAOPrimitives::instance();
@@ -278,26 +302,28 @@ void NGLScene::paintGL()
   //drawing environment cube
   (*shader)[ "envShader" ]->use();
   m_modelTransform.reset();
-  m_modelTransform.setScale(10.0, 10.0, 10.0);
+  m_modelTransform.setScale(100.0, 100.0, 100.0);
   loadMatricesToShader(true);
   prim->draw("cube");
 
   //drawing the harmonica (or for teapot for test purposes)
-  (*shader)["myPhong"]->use();
+  ( *shader )[ ngl::nglColourShader ]->use();
+  ( *shader )["myPhong"]->use();
+  shader->setUniform("Colour", 0.0f, 1.0f, 0.0f, 1.0f);
+
   m_modelTransform.setMatrix(1.0f);
+  m_modelTransform.setScale(0.05f, 0.05f, 0.05f);
   loadMatricesToShader(true);
-  prim->draw( "teapot" );
-  //m_harmonicaGeo->draw();
+  m_harmonicaGeoSides->draw();
+  m_harmonicaGeoMiddle->draw();
 
 
   //drawing other geomtry (ground plane and light spheres)
-  ( *shader )[ ngl::nglColourShader ]->use();
-  shader->setUniform("Colour", 0.5f, 0.5f, 0.5f, 1.0f);
+  ( *shader )["myPhong"]->use();
   m_modelTransform.reset();
-  m_modelTransform.setPosition(0.0, -0.5, 0.0);
-  m_modelTransform.setRotation(90.0, 0.0, 0.0);
+  m_modelTransform.setPosition(0.0f, -0.3f, 0.0f);
   loadMatricesToShader(true);
-  prim->draw("plate");
+  prim->draw("table");
   ( *shader )[ ngl::nglColourShader ]->use();
   shader->setUniform("Colour", 1.0f, 1.0f, 1.0f, 1.0f);
   m_modelTransform.setPosition(m_lightPos);
@@ -310,8 +336,7 @@ void NGLScene::paintGL()
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glViewport(0,0,m_win.width,m_win.height);
   (*shader)["multipassShader"]->use();
-  GLint pid = shader->getProgramID("multipassShader");
-
+  GLuint pid = (shader->getProgramID("multipassShader"));
 
   glActiveTexture(GL_TEXTURE1);
   glBindTexture(GL_TEXTURE_2D, m_fboTextureId);
@@ -319,7 +344,7 @@ void NGLScene::paintGL()
   glActiveTexture(GL_TEXTURE2);
   glBindTexture(GL_TEXTURE_2D, m_fboDepthId);
   m_modelTransform.reset();
-  m_modelTransform.addRotation(90.0, 180.0, 0.0);
+  m_modelTransform.addRotation(90.0, 80.0, 0.0);
   loadMatricesToShader(false);
   prim->draw("plane");
   glBindTexture(GL_TEXTURE_2D, 0);

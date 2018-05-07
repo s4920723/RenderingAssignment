@@ -23,15 +23,19 @@ out vec3 wsNormal;
 out vec2 wsUV;
 out vec3 lightDir;
 out vec3 eyeDir;
+out vec3 reflectionDir;
 
 void main()
 {
   wsNormal = normalize(normalMatrix * inNormal);
   vec4 wsPosition = M * vec4(inPosition, 1.0f);
   vec4 eyePos = MV * vec4(inPosition, 1.0f);
-  eyeDir = normalize(viewerPos - wsPosition.xyz);
+  eyeDir = normalize(wsPosition.xyz - viewerPos);
   lightDir = normalize(keyLight.position.xyz - eyePos.xyz);
   lightDir /= length(lightDir);
+  reflectionDir = reflect(eyeDir, normalize(inNormal));
+
+
 
   wsUV = inUV;
   gl_Position = MVP*vec4(inPosition, 1.0);

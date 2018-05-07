@@ -26,8 +26,6 @@ INCLUDEPATH +=./include \
               C:/NGL/include
 # where our exe is going to live (root of project)
 DESTDIR=./
-
-LIBS += C:/boost/stage/lib/*
 # add the glsl shader files
 OTHER_FILES+= shaders/*.glsl \
               README.md \

@@ -4,6 +4,7 @@ in vec3 wsNormal;
 in vec2 wsUV;
 in vec3 lightDir;
 in vec3 eyeDir;
+in vec3 reflectionDir;
 
 struct lightInfo
 {
@@ -21,7 +22,10 @@ struct materialInfo
     float shininess;
 };
 
-uniform sampler2D tilesOnyx;
+uniform samplerCube envMap;
+uniform sampler2D albidoMap;
+uniform sampler2D roughnessMap;
+uniform sampler2D normalMap;
 uniform lightInfo keyLight;
 out vec4 fragColour;
 
@@ -46,10 +50,13 @@ vec4 phong()
     float spec = pow(max(dot(E, reflectDir), 0.0), highlight);
     vec4 specular = specIntesity * spec * vec4(1.0, 1.0, 1.0, 1.0);
 
-    return diffuse + specular;
+    return diffuse + specular + ambient;
 }
 
 void main()
 {
-    fragColour=vec4(phong() * texture(tilesOnyx, wsUV));
+
+    fragColour=vec4(phong() * texture(albidoMap, wsUV));
+    vec4 reflectionColour = texture(envMap, reflectionDir) * texture(roughnessMap, wsUV);
+    //fragColour = fragColour * reflectionColour;
 }
