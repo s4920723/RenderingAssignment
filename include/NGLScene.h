@@ -117,6 +117,7 @@ private:
 
   ngl::Texture m_texture;
   std::vector<std::string> m_cubeTextures;
+  bool m_isFBODirty = true;
 
   //Object IDs
   GLuint m_fboId;

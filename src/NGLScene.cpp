@@ -30,6 +30,7 @@ void NGLScene::resizeGL( int _w, int _h )
   m_cam.setShape( 45.0f, static_cast<float>( _w ) / _h, 0.05f, 350.0f );
   m_win.width  = static_cast<int>( _w * devicePixelRatio() );
   m_win.height = static_cast<int>( _h * devicePixelRatio() );
+  m_isFBODirty = true;
 }
 
 
@@ -81,9 +82,6 @@ void NGLScene::initializeGL()
   m_cubeTextures.push_back("textures/envTex/sky_zpos.png");
   m_cubeTextures.push_back("textures/envTex/sky_zneg.png");
   loadCubemap();
-
-  //CREATE FRAMEBUFFER OBJECT
-  createFBO();
 
   //INITIALIZE GEOMTRY PRIMITIVES
   ngl::VAOPrimitives *prim=ngl::VAOPrimitives::instance();
@@ -152,9 +150,14 @@ void NGLScene::initLights(ngl::Colour _lightColour, std::string shaderName)
 
 void NGLScene::createFBO()
 {
-    //Bind framebuffer
-    glGenFramebuffers(1, &m_fboId);
     glBindFramebuffer(GL_FRAMEBUFFER, m_fboId);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER)==GL_FRAMEBUFFER_COMPLETE)
+    {
+        glDeleteTextures(1, &m_fboTextureId);
+        glDeleteTextures(1, &m_fboDepthId);
+        glDeleteFramebuffers(1, &m_fboId);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     //Create Colour Texture that the framebuffer will write to
     glGenTextures(1, &m_fboTextureId);
@@ -174,7 +177,9 @@ void NGLScene::createFBO()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    //Attach the textures to the framebuffer
+    //Create framebuffer, bind it and attach the textures to the framebuffer
+    glGenFramebuffers(1, &m_fboId);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_fboId);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_fboTextureId, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_fboDepthId, 0);
     GLenum drawBufs[] = {GL_COLOR_ATTACHMENT0};
@@ -201,7 +206,7 @@ void NGLScene::loadCubemap()
         ngl::Image img;
         img.load(m_cubeTextures[i]);
         glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
-                         0, GL_RGB, img.width(), img.height(), 0, GL_RGB, GL_UNSIGNED_BYTE, img.getPixels());
+                         0, GL_RGBA, img.width(), img.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, img.getPixels());
     }
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -224,11 +229,11 @@ void NGLScene::loadMatricesToShader(bool mouseControls)
   ngl::Mat3 normalMatrix;
   ngl::Mat4 M;
   if (mouseControls)
-  M            = m_mouseGlobalTX * m_modelTransform.getMatrix();
+  M = m_mouseGlobalTX * m_modelTransform.getMatrix();
   else
-  M            = m_modelTransform.getMatrix();
-  MV           = m_cam.getViewMatrix() * M;
-  MVP          = m_cam.getVPMatrix() * M;
+  M = m_modelTransform.getMatrix();
+  MV = m_cam.getViewMatrix() * M;
+  MVP = m_cam.getVPMatrix() * M;
 
   normalMatrix = MV;
   normalMatrix.inverse().transpose();
@@ -245,44 +250,50 @@ void NGLScene::loadMatricesToShader(bool mouseControls)
 
 void NGLScene::paintGL()
 {
-
-
-  // Rotation based on the mouse position for our global transform
+  // Mouse control matricies
   ngl::Mat4 rotX;
   ngl::Mat4 rotY;
-  // create the rotation matrices
   rotX.rotateX( m_win.spinXFace );
   rotY.rotateY( m_win.spinYFace );
-  // multiply the rotations
   m_mouseGlobalTX = rotX * rotY;
-  // add the translations
   m_mouseGlobalTX.m_m[ 3 ][ 0 ] = m_modelPos.m_x;
   m_mouseGlobalTX.m_m[ 3 ][ 1 ] = m_modelPos.m_y;
   m_mouseGlobalTX.m_m[ 3 ][ 2 ] = m_modelPos.m_z;
 
-  //switching framebuffer
+  if (m_isFBODirty)
+  {
+      createFBO();
+      m_isFBODirty = false;
+  }
+
+  //switching to framebuffer object
   glBindFramebuffer(GL_FRAMEBUFFER, m_fboId);
   glViewport(0,0,m_win.width, m_win.height);
   glClearColor(0.5, 0.65, 0.9, 1.0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  ngl::ShaderLib* shader = ngl::ShaderLib::instance();
+  ngl::VAOPrimitives* prim = ngl::VAOPrimitives::instance();
 
   // DRAW SCENE
   //drawing environment cube
-  ngl::ShaderLib* shader = ngl::ShaderLib::instance();
-  ( *shader )[ "envShader" ]->use();
-  ngl::VAOPrimitives* prim = ngl::VAOPrimitives::instance();
-  loadMatricesToShader(false);
+  (*shader)[ "envShader" ]->use();
+  m_modelTransform.reset();
+  m_modelTransform.setScale(10.0, 10.0, 10.0);
+  loadMatricesToShader(true);
   prim->draw("cube");
 
-
-  /*m_modelTransform.setMatrix(1.0f);
+  //drawing the harmonica (or for teapot for test purposes)
+  (*shader)["myPhong"]->use();
+  m_modelTransform.setMatrix(1.0f);
   loadMatricesToShader(true);
   prim->draw( "teapot" );
   //m_harmonicaGeo->draw();
 
 
+  //drawing other geomtry (ground plane and light spheres)
   ( *shader )[ ngl::nglColourShader ]->use();
   shader->setUniform("Colour", 0.5f, 0.5f, 0.5f, 1.0f);
+  m_modelTransform.reset();
   m_modelTransform.setPosition(0.0, -0.5, 0.0);
   m_modelTransform.setRotation(90.0, 0.0, 0.0);
   loadMatricesToShader(true);
@@ -290,8 +301,8 @@ void NGLScene::paintGL()
   ( *shader )[ ngl::nglColourShader ]->use();
   shader->setUniform("Colour", 1.0f, 1.0f, 1.0f, 1.0f);
   m_modelTransform.setPosition(m_lightPos);
-  loadMatricesToShader(false);
-  prim->draw("lightShape"); */
+  loadMatricesToShader(true);
+  prim->draw("lightShape");
 
   //Switch back to normal framebuffer
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -308,7 +319,8 @@ void NGLScene::paintGL()
   glActiveTexture(GL_TEXTURE2);
   glBindTexture(GL_TEXTURE_2D, m_fboDepthId);
   m_modelTransform.reset();
-  loadMatricesToShader(true);
+  m_modelTransform.addRotation(90.0, 180.0, 0.0);
+  loadMatricesToShader(false);
   prim->draw("plane");
   glBindTexture(GL_TEXTURE_2D, 0);
 }
