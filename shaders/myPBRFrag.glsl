@@ -3,11 +3,12 @@
 in vec3 fragPos;
 in vec3 fragNormal;
 in vec2 fragUV;
+in vec3 fragLightPos;
 const float PI = 3.14159265359;
 
 uniform vec3 lightPos;
 uniform vec3 lightCol;
-uniform vec3 viewerPos;
+uniform vec3 camPos;
 uniform float IOR;
 out vec4 fragColour;
 
@@ -17,6 +18,7 @@ uniform sampler2D roughnessMap;
 uniform sampler2D metallicMap;
 uniform sampler2D aoMap;
 uniform sampler2D normalMap;
+uniform samplerCube envMap;
 
 
 // N - normal
@@ -58,45 +60,47 @@ float GGXDistribution(vec3 N, vec3 H, float roughness)
 
 float GeometicAttenuation(vec3 V, vec3 H, vec3 N, float roughness)
 {
-  float VdotH2 = clamp((dot(V,H), 0.0, 1.0));
-  float chi = chiGGX( VdotH2 / clamp((dot(V,N), 0.0, 1.0)) );
+  float VdotH2 = clamp(dot(V,H), 0.0, 1.0);
+  float chi = chiGGX( VdotH2 / clamp(dot(V,N), 0.0, 1.0) );
   VdotH2 = VdotH2 * VdotH2;
   float tan2 = ( 1 - VdotH2 ) / VdotH2;
-  return (chi * 2) / ( 1 + sqrt( 1 + roughness * roughness * tan2 ) );
+  return (1 * 2) / ( 1 + sqrt( 1 + roughness * roughness * tan2 ) );
 }
 
-float fresnel(vec3 V, vec3 H, float IOR)
+vec3 fresnelSchlick(float cosTheta, vec3 F0)
 {
-  float VdotH = dot(V,H);
-  float g = sqrt((IOR*IOR) + (VdotH*VdotH) - 1);
-  float c = VdotH;
-  return 0.5 * (pow((g-c), 2)/(2*pow((g+c), 2))) * (1+pow((c*(g + c)-1, 2))/pow((c*(g - c)+1, 2)));
+    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
 
 void main()
 {
   //Read values from maps
-  vec3 albedo = pow(texture(albedoMap, fragUV), vec3(2.2));
+  vec3 albedo = pow(texture(albedoMap, fragUV).xyz, vec3(2.2));
   float metallic = texture(metallicMap,fragUV).r;
   float roughness = texture(roughnessMap, fragUV).r;
   float ao = texture(aoMap, fragUV).r;
 
+  //TRY TO IMPLEMENT REFLECTION HERE
+  vec3 envColour = texture(envMap, fragPos).rgb;
+  //vec3 F0 = mix(envColour, albedo, metallic);
+  vec3 F0 = albedo;
+
   //Calculate all direction vectors
-  vec3 N = fragNormal;
-  vec3 V = normalize(viewerPos - fragPos);
-  vec3 L = normalize(lightPos - fragPos);;
+  vec3 N = getNormalFromMap();
+  vec3 V = normalize(camPos - fragPos);
+  vec3 L = normalize(fragLightPos - fragPos);;
   vec3 H = normalize(L + V);
 
   //Calculate radiance based on distance
-  float distance = length(lightPos - fragPos);
+  float distance = length(fragLightPos - fragPos);
   float attenuation = 1.0 / (distance * distance);
   vec3 radiance = lightCol * attenuation;
 
   //Calculate cook-torrance
   float NDF = GGXDistribution(N, H, roughness);
   float G = GeometicAttenuation(V, H, N, roughness);
-  vec3 F = fresnel(V, H, IOR);
+  vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
   vec3 nominator    = NDF * G * F;
   float denominator = 4 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.001;
   vec3 specular = nominator / denominator;
@@ -106,9 +110,11 @@ void main()
   vec3 kD = vec3(1.0) - kS; //specular light
   kD *= 1.0 - metallic;
 
+  vec3 Lo = (kD * albedo/PI + specular) * radiance * max(dot(N, L), 0.0);
 
-
-  vec3 outColour
-  outColour = pow(outColour, 0.454);
+  vec3 ambient = vec3(0.03) * albedo * ao;
+  vec3 outColour = ambient + Lo;
+  outColour = outColour/(outColour + vec3(1.0));
+  outColour = pow(outColour, vec3(0.454));
   fragColour = vec4(outColour, 1.0);
 }

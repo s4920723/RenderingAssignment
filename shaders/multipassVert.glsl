@@ -11,6 +11,5 @@ out vec2 wsUV;
 void main()
 {
     wsUV = inUV;
-    //wsUV.y = 1 - inUV.y;
     gl_Position = M * vec4(inPosition, 1.0);
 }

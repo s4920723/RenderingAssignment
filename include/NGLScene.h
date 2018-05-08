@@ -107,6 +107,7 @@ private:
   void createFBO(GLuint _colourUnit, GLuint _depthUnit);
   void loadCubemap();
   void createTexturePack();
+  void renderShadowMap(GLuint _depthUnit);
 
   ngl::Transformation m_modelTransform;
   ngl::Vec3 m_lightPos;
@@ -117,9 +118,14 @@ private:
 
   ngl::Texture m_texture;
   std::vector<std::string> m_cubeTextures;
+
+  //FBO uniform values
   bool m_isFBODirty = true;
+  bool m_blurSwitch = false;
+  float m_focalDepth = 1.0f;
 
   //Object IDs
+  GLuint m_fboShadowId;
   GLuint m_fboId;
   GLuint m_fboTextureId;
   GLuint m_fboDepthId;

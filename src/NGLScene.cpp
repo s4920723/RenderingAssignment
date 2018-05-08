@@ -52,8 +52,9 @@ void NGLScene::initializeGL()
   initShader("jonPhong", "shaders/PhongVertex.glsl", "shaders/PhongFragment.glsl");
   initShader("multipassShader", "shaders/multipassVert.glsl", "shaders/multipassFrag.glsl");
   initShader("envShader", "shaders/envVert.glsl", "shaders/envFrag.glsl");
-  ( *shader )[ "myPhong" ]->use();
+  initShader("shadowPassShader", "shaders/fboShadowsVert.glsl", "shaders/fboShadowsFrag.glsl");
 
+  ( *shader )[ "myPBR" ]->use();
   //CAMERA SETUP
   ngl::Vec3 from( 1, 1, 1 );
   ngl::Vec3 to( 0, 0, 0 );
@@ -63,8 +64,8 @@ void NGLScene::initializeGL()
   shader->setUniform( "viewerPos", m_cam.getEye().toVec3());
 
   //CREATING LIGHTS
-  m_lightPos.set(0.3f, 0.3f, 0.3f);
-  initLights(ngl::Colour(1.0, 1.0, 1.0, 1.0), "myPhong");
+  m_lightPos.set(0.0f, 1.0f, 0.0f);
+  initLights(ngl::Colour(1.0, 1.0, 1.0, 1.0), "myPBR");
 
   //SETTING UP GEOMETRY
   m_harmonicaGeoSides.reset(  new ngl::Obj("data/harmonica_topBottom.obj"));
@@ -78,11 +79,11 @@ void NGLScene::initializeGL()
   m_texture.loadImage("textures/wood/WoodPlanksWorn33_COL_VAR1_3K.jpg");
   m_texture.setMultiTexture(0);
   m_texture.setTextureGL();
-  shader->setUniform("albidoMap", 0);
+  shader->setUniform("albedoMap", 0);
   m_texture.loadImage("textures/wood/WoodPlanksWorn33_GLOSS_3K.jpg");
   m_texture.setMultiTexture(1);
   m_texture.setTextureGL();
-  shader->setUniform("roghnessMap", 1);
+  shader->setUniform("roughnessMap", 1);
   m_texture.loadImage("textures/wood/WoodPlanksWorn33_GLOSS_3K.jpg");
   m_texture.setMultiTexture(2);
   m_texture.setTextureGL();
@@ -91,7 +92,7 @@ void NGLScene::initializeGL()
   m_texture.setMultiTexture(3);
   m_texture.setTextureGL();
   shader->setUniform("normalMap", 3);
-  m_texture.loadImage("textures/onyxTiles/TilesOnyxOpaloBlack001_AO_3K.jpg");
+  m_texture.loadImage("textures/wood/WoodPlanksWorn33_AO_3K.jpg");
   m_texture.setMultiTexture(4);
   m_texture.setTextureGL();
   shader->setUniform("aoMap", 4);
@@ -214,10 +215,39 @@ void NGLScene::createFBO(GLuint _colourUnit, GLuint _depthUnit)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void NGLScene::renderShadowMap(GLuint _depthUnit)
+{
+  //Generate and bind FBO
+  glGenFramebuffers(1, &m_fboShadowId);
+  glBindFramebuffer(GL_FRAMEBUFFER, m_fboShadowId);
+
+  //Create Depth Texture
+  glGenTextures(1, &m_fboDepthId);
+  glActiveTexture(GL_TEXTURE0 + _depthUnit);
+  glBindTexture(GL_TEXTURE_2D, m_fboDepthId);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, m_win.width, m_win.height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glDrawBuffer(GL_NONE);
+  if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
+  {
+      std::cout << "Frame buffer works!\n";
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  m_cam.set(m_lightPos, ngl::Vec3(0.0f, 0.0f, 0.0f), ngl::Vec3(0.0f, 1.0f, 0.0f));
+  loadMatricesToShader(false);
+
+
+}
+
+
 void NGLScene::loadCubemap()
 {
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-    glActiveTexture (GL_TEXTURE3);
+    glActiveTexture (GL_TEXTURE5);
 
     glGenTextures(1, &m_cubeMapId);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMapId);
@@ -237,10 +267,10 @@ void NGLScene::loadCubemap()
 
     ngl::ShaderLib *shader=ngl::ShaderLib::instance();
     shader->use("envShader");
-    shader->setUniform("envMap", 3);
+    shader->setUniform("envMap", 5);
 
     shader->use("myPhong");
-    shader->setUniform("envMap", 3);
+    shader->setUniform("envMap", 5);
 }
 
 
@@ -266,9 +296,9 @@ void NGLScene::loadMatricesToShader(bool mouseControls)
   shader->setUniform( "normalMatrix", normalMatrix );
   shader->setUniform( "M", M );
   shader->setUniform("diffuseColour", ngl::Vec3(1.0f, 0.6f, 0.15f));
-  shader->setUniform("lightColour", ngl::Vec3(1.0f, 1.0f, 1.0f));
+  shader->setUniform("lightCol", ngl::Vec3(1.0f, 1.0f, 1.0f));
   shader->setUniform("lightPos", m_lightPos);
-  shader->setUniform("camPos", m_cam.getEye());
+  shader->setUniform("camPos", m_cam.getEye().toVec3());
 }
 
 
@@ -286,7 +316,7 @@ void NGLScene::paintGL()
 
   if (m_isFBODirty)
   {
-      createFBO(5, 6);
+      createFBO(6, 7);
       m_isFBODirty = false;
   }
 
@@ -302,13 +332,12 @@ void NGLScene::paintGL()
   //drawing environment cube
   (*shader)[ "envShader" ]->use();
   m_modelTransform.reset();
-  m_modelTransform.setScale(100.0, 100.0, 100.0);
+  m_modelTransform.setScale(-100.0, -100.0, -100.0);
   loadMatricesToShader(true);
   prim->draw("cube");
 
   //drawing the harmonica (or for teapot for test purposes)
   ( *shader )[ ngl::nglColourShader ]->use();
-  ( *shader )["myPhong"]->use();
   shader->setUniform("Colour", 0.0f, 1.0f, 0.0f, 1.0f);
 
   m_modelTransform.setMatrix(1.0f);
@@ -319,7 +348,7 @@ void NGLScene::paintGL()
 
 
   //drawing other geomtry (ground plane and light spheres)
-  ( *shader )["myPhong"]->use();
+  ( *shader )["myPBR"]->use();
   m_modelTransform.reset();
   m_modelTransform.setPosition(0.0f, -0.3f, 0.0f);
   loadMatricesToShader(true);
@@ -338,13 +367,19 @@ void NGLScene::paintGL()
   (*shader)["multipassShader"]->use();
   GLuint pid = (shader->getProgramID("multipassShader"));
 
-  glActiveTexture(GL_TEXTURE1);
+  //Load up uniforms to multipass shader
+  glActiveTexture(GL_TEXTURE6);
   glBindTexture(GL_TEXTURE_2D, m_fboTextureId);
-  glUniform1i(glGetUniformLocation(pid, "fboTexture"), 1);
-  glActiveTexture(GL_TEXTURE2);
+  glUniform1i(glGetUniformLocation(pid, "fboTexture"), 6);
+  glActiveTexture(GL_TEXTURE7);
   glBindTexture(GL_TEXTURE_2D, m_fboDepthId);
+  glUniform1i(glGetUniformLocation(pid, "fboDepth"), 7);
+  shader->setUniform("fboSize", ngl::Vec2(m_win.width, m_win.height));
+  shader->setUniform("focalDepth", m_focalDepth);
+  shader->setUniform("blurSwitch", m_blurSwitch);
+  shader->setUniform("blurRadius", 0.01f);
   m_modelTransform.reset();
-  m_modelTransform.addRotation(90.0, 80.0, 0.0);
+  m_modelTransform.addRotation(90.0, 0.0, 0.0);
   loadMatricesToShader(false);
   prim->draw("plane");
   glBindTexture(GL_TEXTURE_2D, 0);
@@ -381,8 +416,31 @@ void NGLScene::keyPressEvent( QKeyEvent* _event )
       m_win.spinYFace=0;
       m_modelPos.set(ngl::Vec3::zero());
     break;
+
+    //light controls
+    case Qt::Key_Right: m_lightPos+=ngl::Vec3(0.0f, 0.0f, 0.1f);
+    break;
+    case Qt::Key_Left: m_lightPos+=ngl::Vec3(0.0f, 0.0f, -0.1f);
+    break;
+    case Qt::Key_Up: m_lightPos+=ngl::Vec3(-0.1f, 0.0f, 0.0f);
+    break;
+    case Qt::Key_Down: m_lightPos+=ngl::Vec3(0.1f, 0.0f, 0.0f);
+    break;
+    case Qt::Key_Plus: m_lightPos+=ngl::Vec3(0.0f, 0.1f, 0.0f);
+    break;
+    case Qt::Key_Minus: m_lightPos+=ngl::Vec3(0.0f, -0.1f, 0.0f);
+    break;
+    case Qt::Key_Period: m_focalDepth += 0.005f;
+    break;
+    //DOP controls
+    case Qt::Key_B : if (m_blurSwitch) m_blurSwitch=false;
+                     else m_blurSwitch=true;
+    break;
+    case Qt::Key_Comma: m_focalDepth -= 0.005f;
+                        if (m_focalDepth < 0.0f) m_focalDepth = 1.0f;
+    break;
     default:
-      break;
+    break;
   }
   update();
 }
