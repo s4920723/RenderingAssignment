@@ -104,10 +104,11 @@ private:
   //----------------------------------------------------------------------------------------------------------------------
   void wheelEvent(QWheelEvent *_event) override;
 
-  void createFBO(GLuint _colourUnit, GLuint _depthUnit);
+  void createDopFBO(GLuint _colourUnit, GLuint _depthUnit);
   void loadCubemap();
   void createTexturePack();
-  void renderShadowMap(GLuint _depthUnit);
+  void createShadowFBO(GLuint _depthUnit);
+  void drawScene(bool _withLightGeo);
 
   ngl::Transformation m_modelTransform;
   ngl::Vec3 m_lightPos;
@@ -122,17 +123,19 @@ private:
   //FBO uniform values
   bool m_isFBODirty = true;
   bool m_blurSwitch = false;
-  float m_focalDepth = 1.0f;
+  float m_focalDepth = 0.75f;
 
   //Object IDs
   GLuint m_fboShadowId;
+  GLuint m_textureShadowId;
   GLuint m_fboId;
   GLuint m_fboTextureId;
   GLuint m_fboDepthId;
   GLuint m_cubeMapId;
 
-  std::unique_ptr<ngl::Obj> m_harmonicaGeoSides;
-  std::unique_ptr<ngl::Obj> m_harmonicaGeoMiddle;
+  std::unique_ptr<ngl::Obj> m_harmonicaTop;
+  std::unique_ptr<ngl::Obj> m_harmonicaBottom;
+  std::unique_ptr<ngl::Obj> m_harmonicaMiddle;
 };
 
 

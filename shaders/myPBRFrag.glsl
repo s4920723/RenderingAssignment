@@ -19,6 +19,7 @@ uniform sampler2D metallicMap;
 uniform sampler2D aoMap;
 uniform sampler2D normalMap;
 uniform samplerCube envMap;
+uniform sampler2D albedoMap2;
 
 
 // N - normal
@@ -64,7 +65,7 @@ float GeometicAttenuation(vec3 V, vec3 H, vec3 N, float roughness)
   float chi = chiGGX( VdotH2 / clamp(dot(V,N), 0.0, 1.0) );
   VdotH2 = VdotH2 * VdotH2;
   float tan2 = ( 1 - VdotH2 ) / VdotH2;
-  return (1 * 2) / ( 1 + sqrt( 1 + roughness * roughness * tan2 ) );
+  return (chi * 2) / ( 1 + sqrt( 1 + roughness * roughness * tan2 ) );
 }
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0)
@@ -76,7 +77,7 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 void main()
 {
   //Read values from maps
-  vec3 albedo = pow(texture(albedoMap, fragUV).xyz, vec3(2.2));
+  vec3 albedo = pow(texture(albedoMap2, fragUV).xyz, vec3(2.2));
   float metallic = texture(metallicMap,fragUV).r;
   float roughness = texture(roughnessMap, fragUV).r;
   float ao = texture(aoMap, fragUV).r;
@@ -84,7 +85,7 @@ void main()
   //TRY TO IMPLEMENT REFLECTION HERE
   vec3 envColour = texture(envMap, fragPos).rgb;
   //vec3 F0 = mix(envColour, albedo, metallic);
-  vec3 F0 = albedo;
+  vec3 F0 = mix(albedo, envColour, 0.5);
 
   //Calculate all direction vectors
   vec3 N = getNormalFromMap();
@@ -117,4 +118,6 @@ void main()
   outColour = outColour/(outColour + vec3(1.0));
   outColour = pow(outColour, vec3(0.454));
   fragColour = vec4(outColour, 1.0);
+
+  //fragColour = texture(envMap, fragPos);
 }

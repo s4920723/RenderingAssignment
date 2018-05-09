@@ -50,9 +50,9 @@ void NGLScene::initializeGL()
   initShader("myPhong", "shaders/myPhongVert.glsl", "shaders/myPhongFrag.glsl");
   initShader("myPBR", "shaders/myPBRVert.glsl", "shaders/myPBRFrag.glsl");
   initShader("jonPhong", "shaders/PhongVertex.glsl", "shaders/PhongFragment.glsl");
-  initShader("multipassShader", "shaders/multipassVert.glsl", "shaders/multipassFrag.glsl");
   initShader("envShader", "shaders/envVert.glsl", "shaders/envFrag.glsl");
-  initShader("shadowPassShader", "shaders/fboShadowsVert.glsl", "shaders/fboShadowsFrag.glsl");
+  initShader("dopShader", "shaders/dopVert.glsl", "shaders/dopFrag.glsl");
+  initShader("shadowShader", "shaders/shadowVert.glsl", "shaders/shadowFrag.glsl");
 
   ( *shader )[ "myPBR" ]->use();
   //CAMERA SETUP
@@ -68,31 +68,37 @@ void NGLScene::initializeGL()
   initLights(ngl::Colour(1.0, 1.0, 1.0, 1.0), "myPBR");
 
   //SETTING UP GEOMETRY
-  m_harmonicaGeoSides.reset(  new ngl::Obj("data/harmonica_topBottom.obj"));
-  m_harmonicaGeoSides->createVAO();
-  m_harmonicaGeoMiddle.reset(  new ngl::Obj("data/harmonica_middle.obj"));
-  m_harmonicaGeoMiddle->createVAO();
+  m_harmonicaTop.reset(  new ngl::Obj("data/harmonica02_top.obj"));
+  m_harmonicaTop->createVAO();
+  m_harmonicaBottom.reset(  new ngl::Obj("data/harmonica02_bottom.obj"));
+  m_harmonicaBottom->createVAO();
+  m_harmonicaMiddle.reset(  new ngl::Obj("data/harmonica02_middle.obj"));
+  m_harmonicaMiddle->createVAO();
 
 
   //SETTING UP TEXTURES
   shader->use("myPBR");
-  m_texture.loadImage("textures/wood/WoodPlanksWorn33_COL_VAR1_3K.jpg");
+  m_texture.loadImage("textures/harmonica/harmonica_top_albedo.jpg");
   m_texture.setMultiTexture(0);
   m_texture.setTextureGL();
   shader->setUniform("albedoMap", 0);
-  m_texture.loadImage("textures/wood/WoodPlanksWorn33_GLOSS_3K.jpg");
+  m_texture.loadImage("textures/harmonica/harmonica_top_albedo.jpg");
+  m_texture.setMultiTexture(5);
+  m_texture.setTextureGL();
+  shader->setUniform("albedoMap2", 5);
+  m_texture.loadImage("textures/harmonica/harmonica_top_roughness.jpg");
   m_texture.setMultiTexture(1);
   m_texture.setTextureGL();
   shader->setUniform("roughnessMap", 1);
-  m_texture.loadImage("textures/wood/WoodPlanksWorn33_GLOSS_3K.jpg");
+  m_texture.loadImage("textures/harmonica/harmonica_top_metallic.jpg");
   m_texture.setMultiTexture(2);
   m_texture.setTextureGL();
   shader->setUniform("metallicMap", 2);
-  m_texture.loadImage("textures/wood/WoodPlanksWorn33_NRM_3K.jpg");
+  m_texture.loadImage("textures/harmonica/harmonica_top_normals.jpg");
   m_texture.setMultiTexture(3);
   m_texture.setTextureGL();
   shader->setUniform("normalMap", 3);
-  m_texture.loadImage("textures/wood/WoodPlanksWorn33_AO_3K.jpg");
+  m_texture.loadImage("textures/harmonica/harmonica_top_ao.jpg");
   m_texture.setMultiTexture(4);
   m_texture.setTextureGL();
   shader->setUniform("aoMap", 4);
@@ -170,7 +176,7 @@ void NGLScene::initLights(ngl::Colour _lightColour, std::string shaderName)
 }
 
 
-void NGLScene::createFBO(GLuint _colourUnit, GLuint _depthUnit)
+void NGLScene::createDopFBO(GLuint _colourUnit, GLuint _depthUnit)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, m_fboId);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER)==GL_FRAMEBUFFER_COMPLETE)
@@ -210,46 +216,45 @@ void NGLScene::createFBO(GLuint _colourUnit, GLuint _depthUnit)
     //Check if the framebuffer works and bind the revert back to the normal framebuffer
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
     {
-        std::cout << "Frame buffer works!\n";
+        std::cout << "DOP frame buffer works!\n";
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void NGLScene::renderShadowMap(GLuint _depthUnit)
+void NGLScene::createShadowFBO(GLuint _depthUnit)
 {
-  //Generate and bind FBO
-  glGenFramebuffers(1, &m_fboShadowId);
-  glBindFramebuffer(GL_FRAMEBUFFER, m_fboShadowId);
+    glGenTextures(1, &m_textureShadowId);
+    glActiveTexture(GL_TEXTURE0+_depthUnit);
+    glBindTexture(GL_TEXTURE_2D, m_textureShadowId);
 
-  //Create Depth Texture
-  glGenTextures(1, &m_fboDepthId);
-  glActiveTexture(GL_TEXTURE0 + _depthUnit);
-  glBindTexture(GL_TEXTURE_2D, m_fboDepthId);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, m_win.width, m_win.height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glDrawBuffer(GL_NONE);
-  if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
-  {
-      std::cout << "Frame buffer works!\n";
-  }
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glTexImage2D( GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, m_win.width, m_win.height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-  m_cam.set(m_lightPos, ngl::Vec3(0.0f, 0.0f, 0.0f), ngl::Vec3(0.0f, 1.0f, 0.0f));
-  loadMatricesToShader(false);
+    // create our FBO
+    glGenFramebuffers(1, &m_fboShadowId);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_fboShadowId);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D, m_textureShadowId, 0);
+    //glDrawBuffer(GL_NONE);
+    //glReadBuffer(GL_NONE);
 
-
+    //Check if the framebuffer works and bind the revert back to the normal framebuffer
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
+    {
+        std::cout << "Shadow frame buffer works!\n";
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 
 void NGLScene::loadCubemap()
 {
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-    glActiveTexture (GL_TEXTURE5);
-
     glGenTextures(1, &m_cubeMapId);
+
+    glActiveTexture (GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMapId);
 
     for (unsigned int i = 0; i < m_cubeTextures.size(); i++)
@@ -267,10 +272,9 @@ void NGLScene::loadCubemap()
 
     ngl::ShaderLib *shader=ngl::ShaderLib::instance();
     shader->use("envShader");
-    shader->setUniform("envMap", 5);
-
-    shader->use("myPhong");
-    shader->setUniform("envMap", 5);
+    shader->setUniform("envMap", 0);
+    shader->use("shadowShader");
+    shader->setUniform("envMap", 0);
 }
 
 
@@ -301,6 +305,47 @@ void NGLScene::loadMatricesToShader(bool mouseControls)
   shader->setUniform("camPos", m_cam.getEye().toVec3());
 }
 
+void NGLScene::drawScene(bool _withLightGeo)
+{
+  ngl::ShaderLib* shader = ngl::ShaderLib::instance();
+  ngl::VAOPrimitives* prim = ngl::VAOPrimitives::instance();
+
+  // DRAW SCENE
+  //drawing environment cube
+  (*shader)[ "envShader" ]->use();
+  m_modelTransform.reset();
+  m_modelTransform.setScale(-100.0, -100.0, -100.0);
+  loadMatricesToShader(true);
+  prim->draw("cube");
+
+  //drawing the harmonica (or for teapot for test purposes)
+
+  ( *shader )["myPBR"]->use();
+  m_modelTransform.setMatrix(1.0f);
+  m_modelTransform.setScale(0.05f, 0.05f, 0.05f);
+  loadMatricesToShader(true);
+  m_harmonicaTop->draw();
+  m_harmonicaMiddle->draw();
+  m_harmonicaBottom->draw();
+
+
+  //drawing other geomtry (ground plane and light spheres)
+  ( *shader )[ ngl::nglColourShader ]->use();
+  shader->setUniform("Colour", 0.0f, 1.0f, 0.0f, 1.0f);
+  m_modelTransform.reset();
+  m_modelTransform.setPosition(0.0f, -0.3f, 0.0f);
+  loadMatricesToShader(true);
+  prim->draw("table");
+
+  if (_withLightGeo)
+  {
+    ( *shader )[ ngl::nglColourShader ]->use();
+    shader->setUniform("Colour", 1.0f, 1.0f, 1.0f, 1.0f);
+    m_modelTransform.setPosition(m_lightPos);
+    loadMatricesToShader(true);
+    prim->draw("lightShape");
+  }
+}
 
 void NGLScene::paintGL()
 {
@@ -316,68 +361,57 @@ void NGLScene::paintGL()
 
   if (m_isFBODirty)
   {
-      createFBO(6, 7);
+      createDopFBO(6, 7);
+      createShadowFBO(9);
       m_isFBODirty = false;
   }
 
-  //switching to framebuffer object
+  //switching to DOP framebuffer object and rendering geometry
   glBindFramebuffer(GL_FRAMEBUFFER, m_fboId);
   glViewport(0,0,m_win.width, m_win.height);
   glClearColor(0.5, 0.65f, 0.9f, 1.0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   ngl::ShaderLib* shader = ngl::ShaderLib::instance();
   ngl::VAOPrimitives* prim = ngl::VAOPrimitives::instance();
+  drawScene(true);
 
-  // DRAW SCENE
-  //drawing environment cube
-  (*shader)[ "envShader" ]->use();
-  m_modelTransform.reset();
-  m_modelTransform.setScale(-100.0, -100.0, -100.0);
-  loadMatricesToShader(true);
-  prim->draw("cube");
-
-  //drawing the harmonica (or for teapot for test purposes)
-  ( *shader )[ ngl::nglColourShader ]->use();
-  shader->setUniform("Colour", 0.0f, 1.0f, 0.0f, 1.0f);
-
-  m_modelTransform.setMatrix(1.0f);
-  m_modelTransform.setScale(0.05f, 0.05f, 0.05f);
-  loadMatricesToShader(true);
-  m_harmonicaGeoSides->draw();
-  m_harmonicaGeoMiddle->draw();
-
-
-  //drawing other geomtry (ground plane and light spheres)
-  ( *shader )["myPBR"]->use();
-  m_modelTransform.reset();
-  m_modelTransform.setPosition(0.0f, -0.3f, 0.0f);
-  loadMatricesToShader(true);
-  prim->draw("table");
-  ( *shader )[ ngl::nglColourShader ]->use();
-  shader->setUniform("Colour", 1.0f, 1.0f, 1.0f, 1.0f);
-  m_modelTransform.setPosition(m_lightPos);
-  loadMatricesToShader(true);
-  prim->draw("lightShape");
+  //switching to shadow framebuffe object, moving camera, rendering geometry
+  glBindFramebuffer(GL_FRAMEBUFFER, m_fboShadowId);
+  glViewport(0,0,m_win.width, m_win.height);
+  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  ngl::Vec3 from = m_lightPos;
+  from.clamp(0.1f, 10.f);
+  m_cam.set(from, ngl::Vec3(0.0f, 0.0f, 0.0f), ngl::Vec3(0.0f, 1.0f, 0.0f));
+  drawScene(false);
+  m_cam.set(ngl::Vec3(1.0f, 1.0f, 1.0f), ngl::Vec3(0.0f, 0.0f, 0.0f), ngl::Vec3(0.0f, 1.0f, 0.0f));
 
   //Switch back to normal framebuffer
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glViewport(0,0,m_win.width,m_win.height);
-  (*shader)["multipassShader"]->use();
-  GLuint pid = (shader->getProgramID("multipassShader"));
 
-  //Load up uniforms to multipass shader
+  //Shadowspass shader uniforms
+  (*shader)["shadowShader"]->use();
+  glActiveTexture(GL_TEXTURE9);
+  glBindTexture(GL_TEXTURE_2D, m_fboShadowId);
+  shader->setUniform("depthMap", 9);
+
+  //DOP shader uniforms
+  (*shader)["dopShader"]->use();
   glActiveTexture(GL_TEXTURE6);
   glBindTexture(GL_TEXTURE_2D, m_fboTextureId);
-  glUniform1i(glGetUniformLocation(pid, "fboTexture"), 6);
+  shader->setUniform("fboTexture", 6);
   glActiveTexture(GL_TEXTURE7);
   glBindTexture(GL_TEXTURE_2D, m_fboDepthId);
-  glUniform1i(glGetUniformLocation(pid, "fboDepth"), 7);
+  shader->setUniform("fboDepth", 7);
   shader->setUniform("fboSize", ngl::Vec2(m_win.width, m_win.height));
   shader->setUniform("focalDepth", m_focalDepth);
   shader->setUniform("blurSwitch", m_blurSwitch);
   shader->setUniform("blurRadius", 0.01f);
+
+  (*shader)["dopShader"]->use();
   m_modelTransform.reset();
   m_modelTransform.addRotation(90.0, 0.0, 0.0);
   loadMatricesToShader(false);
@@ -430,14 +464,13 @@ void NGLScene::keyPressEvent( QKeyEvent* _event )
     break;
     case Qt::Key_Minus: m_lightPos+=ngl::Vec3(0.0f, -0.1f, 0.0f);
     break;
-    case Qt::Key_Period: m_focalDepth += 0.005f;
-    break;
     //DOP controls
     case Qt::Key_B : if (m_blurSwitch) m_blurSwitch=false;
                      else m_blurSwitch=true;
     break;
     case Qt::Key_Comma: m_focalDepth -= 0.005f;
-                        if (m_focalDepth < 0.0f) m_focalDepth = 1.0f;
+    break;
+    case Qt::Key_Period: m_focalDepth += 0.005f;
     break;
     default:
     break;
