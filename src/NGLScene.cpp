@@ -64,7 +64,7 @@ void NGLScene::initializeGL()
   shader->setUniform( "viewerPos", m_cam.getEye().toVec3());
 
   //CREATING LIGHTS
-  m_lightPos.set(0.0f, 1.0f, 0.0f);
+  m_lightPos.set(5.0f, 10.0f, 5.0f);
   initLights(ngl::Colour(1.0, 1.0, 1.0, 1.0), "myPBR");
 
   //SETTING UP GEOMETRY
@@ -82,23 +82,23 @@ void NGLScene::initializeGL()
   m_texture.setMultiTexture(0);
   m_texture.setTextureGL();
   shader->setUniform("albedoMap", 0);
-  m_texture.loadImage("textures/harmonica/harmonica_top_albedo.jpg");
+  m_texture.loadImage("textures/harmonica/harmonicaTop/top_albedo.jpg");
   m_texture.setMultiTexture(5);
   m_texture.setTextureGL();
   shader->setUniform("albedoMap2", 5);
-  m_texture.loadImage("textures/harmonica/harmonica_top_roughness.jpg");
+  m_texture.loadImage("textures/harmonica/harmonicaTop/top_roughness.jpg");
   m_texture.setMultiTexture(1);
   m_texture.setTextureGL();
   shader->setUniform("roughnessMap", 1);
-  m_texture.loadImage("textures/harmonica/harmonica_top_metallic.jpg");
+  m_texture.loadImage("textures/harmonica/harmonicaTop/top_metallic.jpg");
   m_texture.setMultiTexture(2);
   m_texture.setTextureGL();
   shader->setUniform("metallicMap", 2);
-  m_texture.loadImage("textures/harmonica/harmonica_top_normals.jpg");
+  m_texture.loadImage("textures/harmonica/harmonicaTop/top_normal.jpg");
   m_texture.setMultiTexture(3);
   m_texture.setTextureGL();
   shader->setUniform("normalMap", 3);
-  m_texture.loadImage("textures/harmonica/harmonica_top_ao.jpg");
+  m_texture.loadImage("textures/harmonica/harmonicaTop/top_ao.jpg");
   m_texture.setMultiTexture(4);
   m_texture.setTextureGL();
   shader->setUniform("aoMap", 4);

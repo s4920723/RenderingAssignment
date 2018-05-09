@@ -82,16 +82,16 @@ void main()
   float roughness = texture(roughnessMap, fragUV).r;
   float ao = texture(aoMap, fragUV).r;
 
-  //TRY TO IMPLEMENT REFLECTION HERE
-  vec3 envColour = texture(envMap, fragPos).rgb;
-  //vec3 F0 = mix(envColour, albedo, metallic);
-  vec3 F0 = mix(albedo, envColour, 0.5);
-
   //Calculate all direction vectors
   vec3 N = getNormalFromMap();
   vec3 V = normalize(camPos - fragPos);
   vec3 L = normalize(fragLightPos - fragPos);;
   vec3 H = normalize(L + V);
+  vec3 R = reflect(V, N);
+
+  //Environment map
+  vec3 envColour = texture(envMap, R).rgb;
+  vec3 F0 = mix(albedo, envColour, metallic);
 
   //Calculate radiance based on distance
   float distance = length(fragLightPos - fragPos);
@@ -107,8 +107,8 @@ void main()
   vec3 specular = nominator / denominator;
 
   //Energy conservation
-  vec3 kS = F; //specular light
-  vec3 kD = vec3(1.0) - kS; //specular light
+  vec3 kS = F;
+  vec3 kD = vec3(1.0) - kS;
   kD *= 1.0 - metallic;
 
   vec3 Lo = (kD * albedo/PI + specular) * radiance * max(dot(N, L), 0.0);
@@ -118,6 +118,4 @@ void main()
   outColour = outColour/(outColour + vec3(1.0));
   outColour = pow(outColour, vec3(0.454));
   fragColour = vec4(outColour, 1.0);
-
-  //fragColour = texture(envMap, fragPos);
 }
