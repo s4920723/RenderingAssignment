@@ -46,26 +46,24 @@ void NGLScene::initializeGL()
 #endif
 
   //CREATING SHADERS
-  ngl::ShaderLib* shader = ngl::ShaderLib::instance();
   initShader("myPhong", "shaders/myPhongVert.glsl", "shaders/myPhongFrag.glsl");
-  initShader("myPBR", "shaders/myPBRVert.glsl", "shaders/myPBRFrag.glsl");
+  initShader("harmonicaTopPBR", "shaders/myPBRVert.glsl", "shaders/myPBRFrag.glsl");
+  initShader("harmonicaBottomPBR", "shaders/myPBRVert.glsl", "shaders/myPBRFrag.glsl");
+  initShader("woodPBR", "shaders/myPBRVert.glsl", "shaders/myPBRFrag.glsl");
   initShader("jonPhong", "shaders/PhongVertex.glsl", "shaders/PhongFragment.glsl");
   initShader("envShader", "shaders/envVert.glsl", "shaders/envFrag.glsl");
   initShader("dopShader", "shaders/dopVert.glsl", "shaders/dopFrag.glsl");
   initShader("shadowShader", "shaders/shadowVert.glsl", "shaders/shadowFrag.glsl");
 
-  ( *shader )[ "myPBR" ]->use();
   //CAMERA SETUP
   ngl::Vec3 from( 1, 1, 1 );
   ngl::Vec3 to( 0, 0, 0 );
   ngl::Vec3 up( 0, 1, 0 );
   m_cam.set( from, to, up );
   m_cam.setShape( 45.0f, 720.0f / 576.0f, 0.05f, 350.0f );
-  shader->setUniform( "viewerPos", m_cam.getEye().toVec3());
 
-  //CREATING LIGHTS
-  m_lightPos.set(5.0f, 10.0f, 5.0f);
-  initLights(ngl::Colour(1.0, 1.0, 1.0, 1.0), "myPBR");
+  //Set light position
+  m_lightPos.set(0.0f, 5.0f, 5.0f);
 
   //SETTING UP GEOMETRY
   m_harmonicaTop.reset(  new ngl::Obj("data/harmonica02_top.obj"));
@@ -76,16 +74,34 @@ void NGLScene::initializeGL()
   m_harmonicaMiddle->createVAO();
 
 
-  //SETTING UP TEXTURES
-  shader->use("myPBR");
-  m_texture.loadImage("textures/harmonica/harmonica_top_albedo.jpg");
+  //SETTING UP TEXTURE SOURCES
+  /*m_harmonicaTopTextures.push_back("textures/harmonica/harmonicaTop/top_albedo.jpg");
+  m_harmonicaTopTextures.push_back("textures/harmonica/harmonicaTop/top_roughness.jpg");
+  m_harmonicaTopTextures.push_back("textures/harmonica/harmonicaTop/top_metallic.jpg");
+  m_harmonicaTopTextures.push_back("textures/harmonica/harmonicaTop/top_normal.jpg");
+  m_harmonicaTopTextures.push_back("textures/harmonica/harmonicaTop/top_ao.jpg");
+  setPBRTextures("harmonicaTopPBR", m_harmonicaTopTextures);
+
+  m_harmonicaBottomTextures.push_back("textures/harmonica/harmonicaBottom/bottom_albedo.jpg");
+  m_harmonicaBottomTextures.push_back("textures/harmonica/harmonicaBottom/bottom_roughness.jpg");
+  m_harmonicaBottomTextures.push_back("textures/harmonica/harmonicaBottom/bottom_metallic.jpg");
+  m_harmonicaBottomTextures.push_back("textures/harmonica/harmonicaBottom/bottom_normal.jpg");
+  m_harmonicaBottomTextures.push_back("textures/harmonica/harmonicaBottom/bottom_ao.jpg");
+  setPBRTextures("harmonicaBottomPBR", m_harmonicaBottomTextures);*/
+
+  m_woodTextures.push_back("textures/wood/oakfloor_basecolor.png");
+  m_woodTextures.push_back("textures/wood/oakfloor_rough.png");
+  m_woodTextures.push_back("textures/wood/oakfloor_Metalness.psd");
+  m_woodTextures.push_back("textures/wood/oakfloor_normal.png");
+  m_woodTextures.push_back("textures/wood/oakfloor_AO.png");
+  setPBRTextures("woodPBR", m_woodTextures);
+
+  ngl::ShaderLib *shader = ngl::ShaderLib::instance();
+  shader->use("harmonicaTopPBR");
+  m_texture.loadImage("textures/harmonica/harmonicaTop/top_albedo.jpg");
   m_texture.setMultiTexture(0);
   m_texture.setTextureGL();
   shader->setUniform("albedoMap", 0);
-  m_texture.loadImage("textures/harmonica/harmonicaTop/top_albedo.jpg");
-  m_texture.setMultiTexture(5);
-  m_texture.setTextureGL();
-  shader->setUniform("albedoMap2", 5);
   m_texture.loadImage("textures/harmonica/harmonicaTop/top_roughness.jpg");
   m_texture.setMultiTexture(1);
   m_texture.setTextureGL();
@@ -103,6 +119,7 @@ void NGLScene::initializeGL()
   m_texture.setTextureGL();
   shader->setUniform("aoMap", 4);
 
+
   //CREATE ENVIRONMENT MAP
   m_cubeTextures.push_back("textures/envTex/nissiBeach/posx.jpg");
   m_cubeTextures.push_back("textures/envTex/nissiBeach/negx.jpg");
@@ -116,7 +133,7 @@ void NGLScene::initializeGL()
   ngl::VAOPrimitives *prim=ngl::VAOPrimitives::instance();
   prim->createTrianglePlane("plane",2,2,1,1,ngl::Vec3(0,1,0));
   prim->createSphere("lightShape", 0.15f, 64);
-  prim->createTrianglePlane("table", 3, 3, 1, 1, ngl::Vec3(0,1,0));
+  prim->createTrianglePlane("table", 6, 6, 1, 1, ngl::Vec3(0,1,0));
 }
 
 
@@ -138,43 +155,35 @@ void NGLScene::initShader(std::string shaderProgramName, std::string vertSource,
     shader->linkProgramObject( shaderProgram );
 }
 
-
-void NGLScene::initLights(ngl::Colour _lightColour, std::string shaderName)
+void NGLScene::setPBRTextures(std::string _shaderName, std::vector<std::string> _texSources)
 {
-    ngl::ShaderLib *shader=ngl::ShaderLib::instance();
-    shader->use(shaderName);
-
-    ngl::Vec3 keyLightOffset;
-    ngl::Vec3 fillLightOffset;
-    ngl::Vec3 rimLightOffset;
-
-    m_keyLight.enable();
-    m_fillLight.enable();
-    m_rimLight.enable();
-
-    m_keyLight.setPosition(m_lightPos + keyLightOffset);
-    m_fillLight.setPosition(m_lightPos + fillLightOffset);
-    m_rimLight.setPosition(m_lightPos + rimLightOffset);
-
-    m_keyLight.setColour(_lightColour);
-    m_fillLight.setColour(_lightColour);
-    m_rimLight.setColour(_lightColour);
-
-    m_keyLight.setSpecColour(_lightColour);
-    m_fillLight.setSpecColour(_lightColour);
-    m_rimLight.setSpecColour(_lightColour);
-
-    ngl::Mat4 iv = m_cam.getViewMatrix();
-    iv.transpose();
-    m_keyLight.setTransform(iv);
-    m_fillLight.setTransform(iv);
-    m_rimLight.setTransform(iv);
-
-    m_keyLight.loadToShader("keyLight");
-    m_fillLight.loadToShader("fillLight");
-    m_rimLight.loadToShader("rimLight");
+  ngl::ShaderLib *shader = ngl::ShaderLib::instance();
+  ngl::Texture texture;
+  shader->use(_shaderName);
+  texture.setMultiTexture(0);
+  texture.setTextureGL();
+  shader->setUniform("albedoMap", 0);
+  texture.loadImage(_texSources[0]);
+  texture.setMultiTexture(5);
+  texture.setTextureGL();
+  shader->setUniform("albedoMap2", 5);
+  texture.loadImage(_texSources[1]);
+  texture.setMultiTexture(1);
+  texture.setTextureGL();
+  shader->setUniform("roughnessMap", 1);
+  texture.loadImage(_texSources[2]);
+  texture.setMultiTexture(2);
+  texture.setTextureGL();
+  shader->setUniform("metallicMap", 2);
+  texture.loadImage(_texSources[3]);
+  texture.setMultiTexture(3);
+  texture.setTextureGL();
+  shader->setUniform("normalMap", 3);
+  texture.loadImage(_texSources[4]);
+  texture.setMultiTexture(4);
+  texture.setTextureGL();
+  shader->setUniform("aoMap", 4);
 }
-
 
 void NGLScene::createDopFBO(GLuint _colourUnit, GLuint _depthUnit)
 {
@@ -254,7 +263,7 @@ void NGLScene::loadCubemap()
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
     glGenTextures(1, &m_cubeMapId);
 
-    glActiveTexture (GL_TEXTURE0);
+    glActiveTexture (GL_TEXTURE5);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMapId);
 
     for (unsigned int i = 0; i < m_cubeTextures.size(); i++)
@@ -272,9 +281,9 @@ void NGLScene::loadCubemap()
 
     ngl::ShaderLib *shader=ngl::ShaderLib::instance();
     shader->use("envShader");
-    shader->setUniform("envMap", 0);
+    shader->setUniform("envMap", 5);
     shader->use("shadowShader");
-    shader->setUniform("envMap", 0);
+    shader->setUniform("envMap", 5);
 }
 
 
@@ -319,8 +328,7 @@ void NGLScene::drawScene(bool _withLightGeo)
   prim->draw("cube");
 
   //drawing the harmonica (or for teapot for test purposes)
-
-  ( *shader )["myPBR"]->use();
+  ( *shader )["harmonicaTopPBR"]->use();
   m_modelTransform.setMatrix(1.0f);
   m_modelTransform.setScale(0.05f, 0.05f, 0.05f);
   loadMatricesToShader(true);
@@ -330,8 +338,7 @@ void NGLScene::drawScene(bool _withLightGeo)
 
 
   //drawing other geomtry (ground plane and light spheres)
-  ( *shader )[ ngl::nglColourShader ]->use();
-  shader->setUniform("Colour", 0.0f, 1.0f, 0.0f, 1.0f);
+  ( *shader )["woodPBR"]->use();
   m_modelTransform.reset();
   m_modelTransform.setPosition(0.0f, -0.3f, 0.0f);
   loadMatricesToShader(true);

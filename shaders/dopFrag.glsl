@@ -11,7 +11,6 @@ uniform float focalDepth;
 uniform float blurRadius;
 uniform bool blurSwitch;
 
-//samples taken from http://www.geeks3d.com/20100628/3d-programming-ready-to-use-64-sample-poisson-disc/
 const vec2 poissonDisc[12] = {vec2(-0.326212,-0.40581),vec2(-0.840144,-0.07358),
                               vec2(-0.695914,0.457137),vec2(-0.203345,0.620716),
                               vec2(0.96234,-0.194983),vec2(0.473434,-0.480026),

@@ -19,7 +19,6 @@ uniform sampler2D metallicMap;
 uniform sampler2D aoMap;
 uniform sampler2D normalMap;
 uniform samplerCube envMap;
-uniform sampler2D albedoMap2;
 
 
 // N - normal
@@ -77,7 +76,7 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 void main()
 {
   //Read values from maps
-  vec3 albedo = pow(texture(albedoMap2, fragUV).xyz, vec3(2.2));
+  vec3 albedo = pow(texture(albedoMap, fragUV).xyz, vec3(2.2));
   float metallic = texture(metallicMap,fragUV).r;
   float roughness = texture(roughnessMap, fragUV).r;
   float ao = texture(aoMap, fragUV).r;
@@ -91,7 +90,7 @@ void main()
 
   //Environment map
   vec3 envColour = texture(envMap, R).rgb;
-  vec3 F0 = mix(albedo, envColour, metallic);
+  vec3 F0 = mix(albedo, envColour, roughness);
 
   //Calculate radiance based on distance
   float distance = length(fragLightPos - fragPos);

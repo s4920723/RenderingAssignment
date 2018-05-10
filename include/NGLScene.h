@@ -109,6 +109,7 @@ private:
   void createTexturePack();
   void createShadowFBO(GLuint _depthUnit);
   void drawScene(bool _withLightGeo);
+  void setPBRTextures(std::string _shaderName, std::vector<std::string> _textures);
 
   ngl::Transformation m_modelTransform;
   ngl::Vec3 m_lightPos;
@@ -132,6 +133,12 @@ private:
   GLuint m_fboTextureId;
   GLuint m_fboDepthId;
   GLuint m_cubeMapId;
+
+  //Texture arrays
+  std::vector<std::string> m_harmonicaTopTextures;
+  std::vector<std::string> m_harmonicaBottomTextures;
+  std::vector<std::string> m_harmonicaMiddleTextures;
+  std::vector<std::string> m_woodTextures;
 
   std::unique_ptr<ngl::Obj> m_harmonicaTop;
   std::unique_ptr<ngl::Obj> m_harmonicaBottom;
